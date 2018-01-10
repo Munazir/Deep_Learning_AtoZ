@@ -1,0 +1,77 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Wed Jan 10 16:09:31 2018
+
+@author: munazir.h
+"""
+
+#ANN Model to predict the churn
+
+
+##Import the libraries
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
+##Importing the dataset
+bank_data = pd.read_csv("Churn_Modelling.csv")
+X = bank_data.iloc[:,3:13]  ##independent Variable
+y = bank_data.iloc[:,13]   ##dependent variable
+
+
+##Dealiong with the catagorical features
+from sklearn.preprocessing import LabelEncoder,OneHotEncoder
+label_encode_geograpy = LabelEncoder()
+X.iloc[:, 1] = label_encode_geograpy.fit_transform(X.iloc[:, 1])
+label_encode_gender = LabelEncoder()
+X.iloc[:, 2] = label_encode_geograpy.fit_transform(X.iloc[:, 2])
+#since the Geography column is not ordinal so we need to encode it with OneHotEncoder
+onehotencoder = OneHotEncoder(categorical_features= [1])
+X = onehotencoder.fit_transform(X)
+X = X.toarray()
+# to avoid dummy variable trap we will remove the first column
+X = X[:,1:]
+
+## Split the dataset into training and testing sets
+from sklearn.model_selection import train_test_split
+X_train,X_test,y_train, y_test = train_test_split(X,y ,test_size = 0.2, random_state = 0)
+
+
+##Scaling the data to keep all the data at same scale
+from sklearn.preprocessing import StandardScaler
+scale = StandardScaler()
+X_train = scale.fit_transform(X_train)
+X_test = scale.transform(X_test)
+
+
+##importing the keras 
+import keras
+from keras.models import Sequential
+from keras.layers import Dense
+
+##Initialize the ANN
+ann_model = Sequential()
+
+##Add the input and first hidden layer in network
+ann_model.add(Dense(output_dim=6,activation="relu",init="uniform",input_dim=11))
+#adding second hidden layer
+ann_model.add(Dense(output_dim=6,activation="relu",init="uniform"))
+
+#output layer
+ann_model.add(Dense(output_dim=1,activation="sigmoid",init="uniform"))
+
+##compile the ANN
+ann_model.compile(optimizer="adam",loss="binary_crossentropy",metrics=["accuracy"])
+
+
+##fit the model on training set
+ann_model.fit(X_train,y_train,batch_size=10,epochs=100)
+
+
+###prediction from the model
+y_predict = ann_model.predict(X_test)
+y_predict = (y_predict>0.5)
+
+##confusion matrix
+from sklearn.metrics import confusion_matrix
+cm = confusion_matrix(y_test,y_predict)
