@@ -1,0 +1,68 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Thu Jan 11 13:52:23 2018
+
+@author: munazir.h
+"""
+
+#ANN Model to predict the churn
+
+
+##Import the libraries
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
+##Importing the dataset
+bank_data = pd.read_csv("Churn_Modelling.csv")
+X = bank_data.iloc[:,3:13]  ##independent Variable
+y = bank_data.iloc[:,13]   ##dependent variable
+
+
+##Dealiong with the catagorical features
+from sklearn.preprocessing import LabelEncoder,OneHotEncoder
+label_encode_geograpy = LabelEncoder()
+X.iloc[:, 1] = label_encode_geograpy.fit_transform(X.iloc[:, 1])
+label_encode_gender = LabelEncoder()
+X.iloc[:, 2] = label_encode_geograpy.fit_transform(X.iloc[:, 2])
+#since the Geography column is not ordinal so we need to encode it with OneHotEncoder
+onehotencoder = OneHotEncoder(categorical_features= [1])
+X = onehotencoder.fit_transform(X)
+X = X.toarray()
+# to avoid dummy variable trap we will remove the first column
+X = X[:,1:]
+
+## Split the dataset into training and testing sets
+from sklearn.model_selection import train_test_split
+X_train,X_test,y_train, y_test = train_test_split(X,y ,test_size = 0.2, random_state = 0)
+
+
+##Scaling the data to keep all the data at same scale
+from sklearn.preprocessing import StandardScaler
+scale = StandardScaler()
+X_train = scale.fit_transform(X_train)
+X_test = scale.transform(X_test)
+
+###K-fold cross validation to check the variance in accuracy
+##since the k-fold method is not there in keras so we need to wrap it up from 
+#scikit-learn
+
+import keras
+from keras.wrappers.scikit_learn import KerasClassifier
+from sklearn.model_selection import cross_val_score
+
+#since the KerasClassifier expect the model as function so we will write the function
+
+from keras.models import Sequential
+from keras.layers import Dense
+
+def build_ANN_model():
+   ann_model =Sequential()
+   ann_model.add(Dense(output_dim=6,activation="relu",init="uniform",input_dim=11))
+   ann_model.add(Dense(output_dim=6,activation="relu",init="uniform"))
+   ann_model.add(Dense(output_dim=1,activation="sigmoid",init="uniform"))
+   ann_model.compile(optimizer="adam",loss="binary_crossentropy",metrics=["accuracy"])
+   return ann_model
+
+ann_model = KerasClassifier(build_fn=build_ANN_model,batch_size=10,epochs=100)
+accuracies = cross_val_score(estimator=ann_model,X=X_train,y=y_train,cv=10,n_jobs=-1)
