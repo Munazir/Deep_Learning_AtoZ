@@ -1,0 +1,173 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Fri Jan 12 10:40:03 2018
+
+@author: munazir.h
+"""
+###########################
+#In this project we will be working with a  advertising data set, 
+#indicating whether or not a particular internet user clicked on an Advertisement. 
+#We will try to create a model that will predict whether or not they will click on an ad based off the features of that user.
+#
+#This data set contains the following features:
+#
+#'Daily Time Spent on Site': consumer time on site in minutes
+#'Age': cutomer age in years
+#'Area Income': Avg. Income of geographical area of consumer
+#'Daily Internet Usage': Avg. minutes a day consumer is on the internet
+#'Ad Topic Line': Headline of the advertisement
+#'City': City of consumer
+#'Male': Whether or not consumer was male
+#'Country': Country of consumer
+#'Timestamp': Time at which consumer clicked on Ad or closed window
+#'Clicked on Ad': 0 or 1 indicated clicking on Ad
+
+##Importing the libraries
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+##Importing the Dataset
+add_click = pd.read_csv("advertising.csv")
+add_click.head()
+
+##Data Exploration
+add_click.info()
+add_click.describe()
+
+
+##Exploratory Data Analysis
+sns.set_style("white")
+add_click["Age"].hist(bins=40)
+plt.xlabel("Age")
+sns.jointplot(x="Age",y="Area Income",data=add_click)
+#Create a jointplot showing the kde distributions of Daily Time spent on site vs. Age.
+sns.jointplot(x="Age",y="Daily Time Spent on Site",data=add_click,color="red",kind="kde")
+#Create a jointplot of 'Daily Time Spent on Site' vs. 'Daily Internet Usage'
+sns.jointplot(x='Daily Time Spent on Site',y='Daily Internet Usage',data=add_click,color="green")
+#Finally, create a pairplot with the hue defined by the 'Clicked on Ad' column feature
+sns.pairplot(add_click,hue="Clicked on Ad",palette="viridis")
+add_click["City"].value_counts()
+
+
+###test and train data
+X = add_click.iloc[:,[0,1,2,3,6]]
+y= add_click.iloc[:,9]
+
+## Split the dataset into training and testing sets
+from sklearn.model_selection import train_test_split
+X_train,X_test,y_train, y_test = train_test_split(X,y ,test_size = 0.2, random_state = 0)
+
+##applying scaling
+from sklearn.preprocessing import StandardScaler
+scale = StandardScaler()
+X_train = scale.fit_transform(X_train)
+X_test = scale.transform(X_test)
+
+
+##Building simple ANN model
+import keras
+from keras.models import Sequential
+from keras.layers import Dense
+
+add_classifier = Sequential()
+
+add_classifier.add(Dense(output_dim=3,activation="relu",init="uniform",input_dim=5))
+add_classifier.add(Dense(output_dim=3,activation="relu",init="uniform"))
+add_classifier.add(Dense(output_dim=1,activation="sigmoid",init="uniform"))
+
+add_classifier.compile(optimizer="adam",loss="binary_crossentropy",metrics=["accuracy"])
+
+add_classifier.fit(X_train,y_train,batch_size=10,epochs=100)
+
+click_predict = add_classifier.predict(X_test)
+click_predict = (click_predict>0.5)
+
+from sklearn.metrics import confusion_matrix
+cm=confusion_matrix(y_test,click_predict)
+
+
+##improving the accuracy by applying drop out regularisation
+import keras
+from keras.models import Sequential
+from keras.layers import Dense
+from keras.layers import Dropout
+
+add_classifier = Sequential()
+
+add_classifier.add(Dense(output_dim=3,activation="relu",init="uniform",input_dim=5))
+add_classifier.add(Dropout(p=0.1))
+add_classifier.add(Dense(output_dim=3,activation="relu",init="uniform"))
+add_classifier.add(Dropout(p=0.1))
+add_classifier.add(Dense(output_dim=1,activation="sigmoid",init="uniform"))
+
+add_classifier.compile(optimizer="adam",loss="binary_crossentropy",metrics=["accuracy"])
+
+add_classifier.fit(X_train,y_train,batch_size=10,epochs=100)
+
+click_predict = add_classifier.predict(X_test)
+click_predict = (click_predict>0.5)
+
+from sklearn.metrics import confusion_matrix
+cm=confusion_matrix(y_test,click_predict)
+
+##Improving Accuracy of the model with K-fold cross validation
+import keras
+from keras.models import Sequential
+from keras.layers import Dense
+from keras.wrappers.scikit_learn import KerasClassifier
+from sklearn.model_selection import cross_val_score
+
+def build_add_classifier():
+   add_classifier = Sequential()
+   add_classifier.add(Dense(output_dim=3,activation="relu",init="uniform",input_dim=5))
+   add_classifier.add(Dense(output_dim=3,activation="relu",init="uniform"))
+   add_classifier.add(Dense(output_dim=1,activation="sigmoid",init="uniform"))
+   add_classifier.compile(optimizer="adam",loss="binary_crossentropy",metrics=["accuracy"])
+   return add_classifier
+ 
+ann_model = KerasClassifier(build_fn=build_add_classifier,batch_size=10,epochs=100)
+accuracies = cross_val_score(estimator=ann_model,X=X_train,y=y_train,cv=10)
+
+accuracies.mean()
+accuracies.std()
+
+ann_model.fit(X_train,y_train,batch_size=10,epochs=100)
+click_predict = ann_model.predict(X_test)
+click_predict = (click_predict>0.5)
+
+from sklearn.metrics import confusion_matrix
+cm=confusion_matrix(y_test,click_predict)
+
+###Fine tuning the model and Select the best accurcy and best parameters
+import keras
+from keras.models import Sequential
+from keras.layers import Dense
+from keras.wrappers.scikit_learn import KerasClassifier
+
+def build_add_classifier(optimizer):
+   add_classifier = Sequential()
+   add_classifier.add(Dense(output_dim=3,activation="relu",init="uniform",input_dim=5))
+   add_classifier.add(Dense(output_dim=3,activation="relu",init="uniform"))
+   add_classifier.add(Dense(output_dim=1,activation="sigmoid",init="uniform"))
+   add_classifier.compile(optimizer=optimizer,loss="binary_crossentropy",metrics=["accuracy"])
+   return add_classifier
+
+ann_model = KerasClassifier(build_fn=build_add_classifier) 
+parameters = {"batch_size":[10,12],
+              "epochs":[50,100],
+              "optimizer":["adam","rmsprop"]}
+
+from sklearn.model_selection import GridSearchCV
+grid_search = GridSearchCV(param_grid=parameters,
+                           scoring="accuracy",
+                           cv=10,
+                           estimator=ann_model
+                           )
+grid_search.fit(X_train,y_train)
+
+best_parameters = grid_search.best_params_
+best_accuracy = grid_search.best_score_
+
+
