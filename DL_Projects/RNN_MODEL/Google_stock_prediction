@@ -1,0 +1,119 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Tue Jan 16 11:37:12 2018
+
+@author: munazir.h
+"""
+
+####Building RNN LSTM
+###Stock price prediction of Google stock price
+##high and low point trends prediction
+## we will trian the model on five years(2012 to 2016) of google trend data
+##predict the Jan 2017
+
+
+###Data preprocessing
+
+#importing the libraries
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
+#Data import 
+stock_train = pd.read_csv("Google_Stock_Price_Train.csv")
+training_Set = stock_train.iloc[:,1:2].values
+
+#feature Scaling 
+#Normalisation or standardisation
+#for RNN we go for Normalisation
+from sklearn.preprocessing import MinMaxScaler
+scale = MinMaxScaler(feature_range=(0,1))
+training_Set_scale = scale.fit_transform(training_Set)
+
+#no of time steps i , e what a network must remember
+#creating  A data structure with 60 timesteps and 1 output
+#mean 60 previous financial days(3 month)
+#for every output prediction it is gonna learn from 60 previous days stock
+X_train = []
+y_train =[]
+for i in range(60,1258):
+   X_train.append(training_Set_scale[i-60:i,0])
+   y_train.append(training_Set_scale[i,0])
+
+X_train,y_train = np.array(X_train),np.array(y_train)
+
+#Reshaping the Data
+X_train = np.reshape(X_train,(X_train.shape[0],X_train.shape[1],1))
+
+
+###Building the RNN Model
+
+##import the keras libraries and packages
+from keras.models import Sequential
+from keras.layers import Dense
+from keras.layers import LSTM
+from  keras.layers import Dropout
+
+##Initialize the RNN 
+regressor = Sequential()  #because we  are predicting the continuous value
+
+##Adding the first LSTM layer and Drop out regularisation
+regressor.add(LSTM(units=50,return_sequences =True,input_shape=(X_train.shape[1],1)))
+regressor.add(Dropout(p=0.2))
+
+##Adding the second LSTM layer and Drop out regularisation
+regressor.add(LSTM(units=50,return_sequences =True))
+regressor.add(Dropout(p=0.2))
+
+##Adding the third LSTM layer and Drop out regularisation
+regressor.add(LSTM(units=50,return_sequences =True))
+regressor.add(Dropout(p=0.2))
+
+##Adding the third LSTM layer and Drop out regularisation
+regressor.add(LSTM(units=50,return_sequences =False))
+regressor.add(Dropout(p=0.2))
+
+##OUTPUT layer
+regressor.add(Dense(units=1))
+
+
+##Compile the RNN
+regressor.compile(optimizer="adam",loss="mean_squared_error")
+
+
+##fitting the RNN to the training set
+regressor.fit(X_train,y_train,epochs=100,batch_size=32)
+
+###make the prediction and Visualize the results
+##get the real stock price for 2017
+stock_test = pd.read_csv("Google_Stock_Price_Test.csv")
+real_stock_price = stock_test.iloc[:,1:2].values
+
+#getting the predicted stock prices
+dataset_total = pd.concat((stock_train["Open"],stock_test["Open"]), axis=0)
+inputs = dataset_total[len(dataset_total)-len(stock_test)-60:].values
+inputs = inputs.reshape(-1,1)
+inputs = scale.transform(inputs)
+
+#prepare the 3d structure 
+X_test = []
+for i in range(60,80):
+   X_test.append(inputs[i-60:i,0])
+   
+X_test = np.array(X_test)
+#Reshaping the Data
+X_test = np.reshape(X_test,(X_test.shape[0],X_test.shape[1],1))
+
+
+##prediction
+predicted_stock_price = regressor.predict(X_test)
+predicted_stock_price=scale.inverse_transform(predicted_stock_price)
+
+##Visualize the results
+plt.plot(real_stock_price,color="red",label="Real Google Stock Prices")
+plt.plot(predicted_stock_price,color="blue",label="Predicted Google Stock Prices")
+plt.title("Google Stock Price prediction")
+plt.xlabel("jan 3rd to jan 31")
+plt.ylabel("Google Stock price")
+plt.legend()
+plt.show()
