@@ -1,0 +1,90 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Thu Jan 18 15:32:57 2018
+
+@author: munazir.h
+"""
+
+##Hybrid deep learning Model
+
+#part1.Identifying the fraud with SOM
+
+#importing the libraries
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
+#importing the dataset
+bank_dataset = pd.read_csv('Credit_Card_Applications.csv')
+X = bank_dataset.iloc[:,:-1].values
+y = bank_dataset.iloc[:,-1].values
+
+#scaling the data
+from sklearn.preprocessing import MinMaxScaler
+scale = MinMaxScaler(feature_range=(0,1))
+X = scale.fit_transform(X)
+
+#train the SOM
+from minisom import MiniSom
+som = MiniSom(x=15,y=15,input_len=15,sigma=1.5,learning_rate=0.7)
+som.random_weights_init(X)
+som.train_random(data=X,num_iteration=100)
+
+#visualize the results
+from pylab import bone,pcolor,colorbar,plot,show
+bone()
+pcolor(som.distance_map().T)
+colorbar()
+markers =['o','s']
+colors = ['red','blue']
+for i , x in enumerate(X):
+   w = som.winner(x)
+   plot(w[0]+0.5,
+        w[1]+0.5,
+        markers[y[i]],
+        markeredgecolor=colors[y[i]],
+        markerfacecolor='None',
+        markersize = 10,
+        markeredgewidth=2
+        )
+show()
+
+
+#finding the fraunds
+mappings = som.win_map(X)
+frauds = np.concatenate((mappings[(7,7)],mappings[(8,7)],mappings[(7,8)],
+                                  mappings[(3,10)],
+                                  mappings[(7,2)]),axis=0)
+frauds = scale.inverse_transform(frauds)
+
+
+##Part 2 .going from unsupervised to supervised
+
+#create matrix of feayures
+customers = bank_dataset.iloc[:,1:]
+
+#create the dependent variable
+is_fraud = np.zeros(len(bank_dataset))
+for i in range(len(bank_dataset)):
+   if bank_dataset.iloc[i,0] in frauds:
+      is_fraud[i]=1
+      
+##ANN
+#feature scaling
+from sklearn.preprocessing import StandardScaler
+sc=StandardScaler()
+customers = sc.fit_transform(customers)
+
+#ANN Model
+from keras.models import Sequential
+from keras.layers import Dense
+model =Sequential()
+model.add(Dense(units=3,kernel_initializer="uniform",activation="relu",input_dim=15))
+model.add(Dense(units=1,kernel_initializer="uniform",activation="sigmoid"))
+model.compile(optimizer='adam',loss='binary_crossentropy',metrics=['accuracy'])
+model.fit(customers,is_fraud,batch_size=1,epochs=2)
+
+#predicted probablilies
+fraud_prediction = model.predict(customers)
+fraud_prediction = np.concatenate((bank_dataset.iloc[:,0:1].values,fraud_prediction),axis=1)
+fraud_prediction = fraud_prediction[fraud_prediction[:,1].argsort()]
